@@ -77,6 +77,11 @@ data$GRNTP <- as.numeric(data$GRNTP)
 data <- data %>% 
   mutate(GRNTP = na_if(GRPIP, 0))
 
+#Income
+data$PINCP <- as.numeric(data$PINCP)
+data <- data %>% 
+  mutate(PINCP = na_if(PINCP, -19999))
+
 # Means of transportation
 data <- data %>%
   mutate(JWTRNS = case_when(

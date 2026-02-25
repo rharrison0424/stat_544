@@ -141,7 +141,9 @@ la_pums <- get_pums(
     "HICOV", # Health insurance or not
     "HHT2",  # Household type
     "CIT", # Citizenship
-    "ADJHSG"
+    "ADJHSG", #Adjustment for gross rent
+    "PINCP", # Total Persons Income
+    "ADJINC" #Adjustment for total persons income
   ),
   state = "CA",
   puma = la_puma_codes,
