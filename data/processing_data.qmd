@@ -10,6 +10,7 @@ library(arrow)
 data <- read_parquet("la_pums_individual_2024_acs.parquet")
 ```
 
+
 ```{r}
 glimpse(data[1:23])
 ```
@@ -17,6 +18,9 @@ glimpse(data[1:23])
 ```{r}
 # Make age numeric
 data$AGEP <- as.numeric(data$AGEP)
+data <- data %>%
+  filter(AGEP <= 99,
+         AGEP >= 1)
 
 # Define Race
 data <- data %>% 
@@ -64,6 +68,8 @@ data <- data %>%
 # Gross rent as % of income
 data$GRPIP <- as.numeric(data$GRPIP)
 data <- data %>% 
+  filter(GRPIP <= 101,
+         GRPIP >= 0) %>% 
   mutate(GRPIP = na_if(GRPIP, 0))
 
 #Gross rent
@@ -213,6 +219,13 @@ data <- data %>%
     TRUE ~ CIT
   ))
 ```
+
+```{r}
+data <- data %>%
+  rename_with(tolower) %>% 
+  rename(race = rac1p)
+```
+
 
 ```{r}
 library(arrow)

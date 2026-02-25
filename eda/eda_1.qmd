@@ -6,6 +6,7 @@ format: pdf
 ```{r}
 library(tidyverse)
 library(arrow)
+library(ggthemes)
 
 data <- read_parquet("../data/clean_data.parquet")
 ```
@@ -15,10 +16,29 @@ glimpse(data[1:23])
 ```
 
 ```{r}
-length(unique(data$PUMA))
+data %>%
+  select(agep) %>% 
+  ggplot() +
+    geom_histogram(aes(x = agep),
+                   color = "white",
+                   fill = "black") +
+    theme_few()
 ```
 
 ```{r}
-colnames(data)
+data %>%
+  select(race, grpip) %>%
+  ggplot() +
+    geom_boxplot(aes(x = grpip,
+                     y = reorder(race, grpip))) +
+    theme_few()
+```
+
+```{r}
+data %>%
+  select(race, dis) %>%
+  filter(!c(race %in% c("Native Alaskan", "Native Hawaiin or Pacific Islander"))) %>% 
+  ggplot() +
+    geom_bar(aes(x = dis, fill = race), position = "stack")
 ```
 

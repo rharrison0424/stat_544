@@ -8,7 +8,7 @@ library(tidycensus)
 library(tidyverse)
 library(arrow)
 
-census_api_key("ce7d82d8400c63ca9d4e119f5b849640c5bc3767")
+census_api_key("ce7d82d8400c63ca9d4e119f5b849640c5bc3767", install = TRUE, overwrite = TRUE)
 ```
 
 ### Variable list names for ACS and then using those to get data on a tract level. This should be great for mapping
@@ -140,7 +140,8 @@ la_pums <- get_pums(
     "FS",   # SNAP benefits
     "HICOV", # Health insurance or not
     "HHT2",  # Household type
-    "CIT" # Citizenship
+    "CIT", # Citizenship
+    "ADJHSG"
   ),
   state = "CA",
   puma = la_puma_codes,
@@ -152,27 +153,5 @@ la_pums <- get_pums(
 
 ```{r}
 write_parquet(la_pums, "la_pums_individual_2024_acs.parquet")
-```
-
-
-```{r}
-glimpse(la_pums)
-```
-
-```{r}
-test <- get_pums(
-  variables = c(
-    "AGEP" # Age
-  ),
-  state = "CA",
-  puma = la_puma_codes,
-  survey = "acs1",
-  year = 2024,
-  rep_weights = "person"
-)
-```
-
-```{r}
-glimpse(test)
 ```
 
