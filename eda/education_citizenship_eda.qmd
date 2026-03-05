@@ -58,7 +58,7 @@ citizen_eda_18 %>%
     labs(fill = "",
          title = "Citizenship Determines Likelihood of Income",
          caption = "Source: ACS PUMS 2024 for LA County",
-         subtitle = "79% chance of making less than 60k for non-citizens vs. 47% for citizens") +
+         subtitle = "80% chance of making less than 60k for non-citizens vs. 55% for citizens") +
     xlab("") +
     ylab("") +
     theme(plot.title = element_text(hjust = 0.5),
