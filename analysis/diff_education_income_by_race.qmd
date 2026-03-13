@@ -4,10 +4,15 @@ format: pdf
 ---
 
 ```{r}
-library(tidyverse)
 library(arrow)
-library(ggplot2)
+library(ggthemes)
+library(tidyverse)
 library(survey)
+library(srvyr)
+library(broom)
+library(gt)
+library(prettyunits)
+library(ggplot2)
 ```
 
 
@@ -28,10 +33,7 @@ income_by_education <- data %>%
   select(
     education,
     income_personal,
-    race,
-    pwgtp,
-    pwgtp1,
-    wgtp
+    race
   )
 ```
 
@@ -126,18 +128,54 @@ summary(anova_model)
 
 
 ```{r}
-repweights <- income_by_education[, paste0("pwgtp", 1:80)]
+data_selected <- data %>% 
+  mutate(cit_simp = ifelse(cit != "Not a U.S. citizen",
+                                 "Citizen",
+                                 "Non-Citizen"),
+         cit_simp = factor(cit_simp,
+                           levels = c("Non-Citizen",
+                                            "Citizen"))) %>% 
+  select(income_personal, age, race_simp, cit_simp, gross_rent, education, health_insurance,
+          snap_benefits, jwtrns, puma, pwgtp, pwgtp1:pwgtp80) %>%
+  filter(
+    !is.na(income_personal),
+    !is.na(education),
+    !is.na(race_simp),
+    !is.na(pwgtp)
+  )
 
-design <- svrepdesign(
-  weights = ~pwgtp,
-  repweights = repweights,
-  type = "successive-difference",
-  data = income_by_education
+rep_weights <- paste0("pwgtp", 1:80)
+
+acs_design <- data_selected %>%
+  as_survey_rep(
+    weights    = pwgtp,
+    repweights = all_of(rep_weights),
+    type       = "successive-difference",
+    mse        = TRUE
 )
 ```
 
 ```{r}
-svymean(~income_personal, design)
+glimpse(acs_design)
+```
+
+
+```{r}
+income_education <- acs_design %>%
+  filter(
+    education %in% c("Regular high school diploma", "Bachelor's degree"),
+    race_simp != "American Native" & race_simp != "Native Alaskan", race_simp != "Native Hawaiin or Pacific Islander"
+)
+```
+
+
+```{r}
+results <- income_education %>%
+  group_by(education, race_simp) %>%
+  summarise(
+    mean_income = survey_mean(income_personal, vartype = c("se", "ci"), na.rm = TRUE))
+print(results)
+
 ```
 
 ```{r}
