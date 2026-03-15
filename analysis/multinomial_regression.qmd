@@ -1,8 +1,8 @@
 ---
-title: "multinomial classification"
+  title: "multinomial classification"
 format: pdf
 ---
-
+  
 ```{r}
 library(tidyverse)
 library(arrow)
@@ -40,9 +40,9 @@ test<- cbind(test, pred.values)
 test$maxprob<- pmax(test$'Asian',test$'Black',test$'Hispanic',test$'Other',test$'White')
 
 test$predclass<- ifelse(test$maxprob==test$'Asian', 'Asian',
-  ifelse(test$maxprob==test$'Black','Black',
-         ifelse(test$maxprob==test$'Hispanic','Hispanic',
-                ifelse(test$maxprob==test$'Other','Other','White'))))
+                        ifelse(test$maxprob==test$'Black','Black',
+                               ifelse(test$maxprob==test$'Hispanic','Hispanic',
+                                      ifelse(test$maxprob==test$'Other','Other','White'))))
 
 conf.mat <- table(Predicted=test$predclass, Actual=test$race_simp)
 
@@ -56,7 +56,7 @@ citizen_eda_30 <- data %>%
   select(age, gross_rent, jwtrns, povpip, education, hupac, income_household, wkhp, esr, snap_benefits, health_insurance, cit, race_simp) %>% 
   filter(age > 30,
          esr != "Not in Labor Force")
-  
+
 set.seed(0)
 
 sample<- createDataPartition(citizen_eda_30$race_simp, p=0.8, list=FALSE)
@@ -93,9 +93,9 @@ test<- cbind(test, pred.values)
 test$maxprob<- pmax(test$'Asian',test$'Black',test$'Hispanic',test$'Other',test$'White')
 
 test$predclass<- ifelse(test$maxprob==test$'Asian', 'Asian',
-  ifelse(test$maxprob==test$'Black','Black',
-         ifelse(test$maxprob==test$'Hispanic','Hispanic',
-                ifelse(test$maxprob==test$'Other','Other','White'))))
+                        ifelse(test$maxprob==test$'Black','Black',
+                               ifelse(test$maxprob==test$'Hispanic','Hispanic',
+                                      ifelse(test$maxprob==test$'Other','Other','White'))))
 
 conf.mat <- table(Predicted=test$predclass, Actual=test$race_simp)
 
@@ -106,9 +106,9 @@ print(conf.mat)
 
 ```{r}
 citizen_eda_30$target <- ifelse(citizen_eda_30$race_simp=="Asian", 0,
-  ifelse(citizen_eda_30$race_simp=="Black", 1,
-         ifelse(citizen_eda_30$race_simp=="Hispanic", 2,
-                ifelse(citizen_eda_30$race_simp=="Other", 3, 4))))
+                                ifelse(citizen_eda_30$race_simp=="Black", 1,
+                                       ifelse(citizen_eda_30$race_simp=="Hispanic", 2,
+                                              ifelse(citizen_eda_30$race_simp=="Other", 3, 4))))
 
 citizen_eda_30 <- subset(citizen_eda_30, select=-race_simp)
 
@@ -128,41 +128,22 @@ test.y  <- test$target
 dtrain <- xgb.DMatrix(data = train.x, label = train.y)
 
 xgb.mclass<- xgb.train(data=dtrain, params=list(num_class=5,
-max_depth=6, eta=0.1, objective="multi:softprob"), nrounds=1000)
+                                                max_depth=5, eta=0.1, objective="multi:softprob"), nrounds=1000)
 
 pred.prob <- predict(xgb.mclass, test.x)
 pred.class <- max.col(pred.prob) - 1
 
 test$predclass<- ifelse(pred.class==0, 'Asian',
-  ifelse(pred.class==1,'Black',
-         ifelse(pred.class==2,'Hispanic',
-                ifelse(pred.class==3,'Other','White'))))
+                        ifelse(pred.class==1,'Black',
+                               ifelse(pred.class==2,'Hispanic',
+                                      ifelse(pred.class==3,'Other','White'))))
 
-test$race_simp<- ifelse(pred.class==0, 'Asian',
-  ifelse(pred.class==1,'Black',
-         ifelse(pred.class==2,'Hispanic',
-                ifelse(pred.class==3,'Other','White'))))
+test$target<- ifelse(test$target==0, 'Asian',
+                     ifelse(test$target==1,'Black',
+                            ifelse(test$target==2,'Hispanic',
+                                   ifelse(test$target==3,'Other','White'))))
 
-conf.mat <- table(Predicted=test$predclass, Actual=test$race_simp)
-
-print(conf.mat)
-```
-
-```{r}
-pred.prob <- predict(xgb.mclass, train.x)
-pred.class <- max.col(pred.prob) - 1
-
-train$predclass<- ifelse(pred.class==0, 'Asian',
-  ifelse(pred.class==1,'Black',
-         ifelse(pred.class==2,'Hispanic',
-                ifelse(pred.class==3,'Other','White'))))
-
-train$race_simp<- ifelse(pred.class==0, 'Asian',
-  ifelse(pred.class==1,'Black',
-         ifelse(pred.class==2,'Hispanic',
-                ifelse(pred.class==3,'Other','White'))))
-
-conf.mat <- table(Predicted=train$predclass, Actual=train$race_simp)
+conf.mat <- table(Predicted=test$predclass, Actual=test$target)
 
 print(conf.mat)
 ```
