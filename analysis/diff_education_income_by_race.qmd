@@ -168,6 +168,10 @@ income_education <- acs_design %>%
 )
 ```
 
+```{r}
+glimpse(income_education)
+```
+
 
 ```{r}
 results <- income_education %>%

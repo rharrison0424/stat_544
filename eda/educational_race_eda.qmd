@@ -17,10 +17,10 @@ glimpse(data[1:27])
 
 ```{r}
 education_eda_18 <- data %>% 
-  filter(age > 18,
+  dplyr::filter(age > 18,
          esr != "Not in Labor Force"
          ) %>% 
-  select(age,
+  dplyr::select(age,
          race,
          race_simp,
          gross_rent,
@@ -29,12 +29,10 @@ education_eda_18 <- data %>%
          health_insurance,
          snap_benefits,
          puma)
-
-glimpse(education_eda_30)
 ```
 
 ```{r}
-education_eda_18 %>%
+edu_inc_plot <- education_eda_18 %>%
   filter(income_personal <= 500000) %>% 
   ggplot() +
     geom_boxplot(aes(x = income_personal / 1000,
@@ -42,14 +40,22 @@ education_eda_18 %>%
                  outlier.shape = NA) + 
   theme_few() +
   ylab("") +
-  xlab("Income (thousands)") +
-  labs(title = "Higher Education Level Is Associated with Higher Income",
-       caption = "Source: ACS PUMS 2024 for LA County") +
+  xlab("") +
+  labs(
+    #title = "Higher Education Level Is Associated with Higher Income",
+       #caption = "Source: ACS PUMS 2024 for LA County"
+       ) +
   theme(plot.title = element_text(hjust = 0.5))
+
+ggsave("../../midterm_presentation/edu_inc_plot.png",
+       edu_inc_plot,
+       width = 10, 
+       height = 6, 
+       dpi = 600)
 ```
 
 ```{r}
-education_eda_18 %>% 
+race_edu_plot <- education_eda_18 %>% 
   mutate(race_simp = factor(race_simp,
                             levels = c("White", "Hispanic", "Asian", "Black", "Other")),
          education = factor(education,
@@ -80,12 +86,19 @@ education_eda_18 %>%
         axis.ticks.x = element_blank(),
         plot.title = element_text(hjust = 0.5)) +
   labs(fill = "",
-       title = "Race Is Disproportionately Spread Across Education Levels",
-       caption = "Source: ACS PUMS 2024 for LA County")
+       #title = "Race Is Disproportionately Spread Across Education Levels",
+       #caption = "Source: ACS PUMS 2024 for LA County"
+       )
+
+ggsave("../../midterm_presentation/race_edu_plot.png",
+       race_edu_plot,
+       width = 10, 
+       height = 6, 
+       dpi = 600)
 ```
 
 ```{r}
-education_eda_18 %>% 
+inc_race_plot <-education_eda_18 %>% 
   mutate(race_simp = factor(race_simp,
                             levels = c("White", "Hispanic", "Asian", "Black", "Other")),
          education = factor(education,
@@ -106,7 +119,7 @@ education_eda_18 %>%
                                      income_personal <= 120000 ~ "90k-120k",
                                      income_personal <= 150000 ~ "120k-150k",
                                      income_personal > 150000 ~ "150k+")) %>% 
-  select(race_simp, income_brackets, income_personal) %>%
+  dplyr::select(race_simp, income_brackets, income_personal) %>%
   ggplot() +
     geom_bar(aes(y = reorder(income_brackets,income_personal),
                  fill = race_simp),
@@ -120,9 +133,16 @@ education_eda_18 %>%
     theme(axis.text.x = element_blank(),
          axis.ticks.x = element_blank()) +
     labs(fill = "",
-         title = "Race Is Disproportionately Spread Across Income Brackets",
-        caption = "Source: ACS PUMS 2024 for LA County") +
+         #title = "Race Is Disproportionately Spread Across Income Brackets",
+        #caption = "Source: ACS PUMS 2024 for LA County"
+        ) +
     xlab("")+
     ylab("")
+
+ggsave("../../midterm_presentation/inc_race_plot.png",
+       inc_race_plot,
+       width = 10, 
+       height = 6, 
+       dpi = 600)
 ```
 

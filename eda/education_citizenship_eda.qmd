@@ -23,7 +23,7 @@ glimpse(data[1:27])
 
 ```{r}
 citizen_eda_18 <- data %>% 
-  select(age, income_personal, cit, education, esr, race_simp) %>% 
+  dplyr::select(age, income_personal, cit, education, esr, race_simp) %>% 
   filter(age > 18,
          esr != "Not in Labor Force") %>% 
   mutate(income_brackets = case_when(income_personal <= 15000 ~ "0-15k",
@@ -87,7 +87,7 @@ citizen_eda_18 %>%
 ```
 
 ```{r}
-citizen_eda_18 %>% 
+rac_cit_plot <- citizen_eda_18 %>% 
   mutate(race_simp = factor(race_simp,
                             levels = c("White", "Hispanic", "Asian", "Black", "Other")),
          education = factor(education,
@@ -123,9 +123,16 @@ citizen_eda_18 %>%
   theme(axis.text.x = element_blank(),
         axis.ticks.x = element_blank(),
         plot.title = element_text(hjust = 0.5)) +
-  labs(title = "Race Is Disproportionately Spread Across Citizenship Status",
-       caption = "Source: ACS PUMS 2024 for LA County",
+  labs(
+    #title = "Race Is Disproportionately Spread Across Citizenship Status",
+       #caption = "Source: ACS PUMS 2024 for LA County",
        fill = "")
+
+ggsave("../../midterm_presentation/rac_cit_plot.png",
+       rac_cit_plot,
+       width = 10, 
+       height = 6, 
+       dpi = 600)
 ```
 
 ```{r}
