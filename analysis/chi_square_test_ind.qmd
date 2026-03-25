@@ -97,19 +97,19 @@ des <- svrepdesign(
 # CHI SQUARED TESTS
 
 #Education x race
-svy_edu_race <- svychisq(~education + race_simp, design = des, statistic = "F")
+svy_edu_race <- svychisq(~education + race_simp, design = des, statistic = "Chisq")
 svy_edu_race
 
 #Citizenship x race
-svy_cit_race <- svychisq(~cit_simp + race_simp,  design = des, statistic = "F")
+svy_cit_race <- svychisq(~cit_simp + race_simp,  design = des, statistic = "Chisq")
 svy_cit_race
 
 #Income x race
-svy_inc_race <- svychisq(~income_cat + race_simp, design = des, statistic = "F")
+svy_inc_race <- svychisq(~income_cat + race_simp, design = des, statistic = "Chisq")
 svy_inc_race
 
 #Education x race
-svy_edu_cit  <- svychisq(~education + cit_simp,   design = des, statistic = "F")
+svy_edu_cit  <- svychisq(~education + cit_simp,   design = des, statistic = "Chisq")
 svy_edu_cit
 ```
 
