@@ -47,6 +47,90 @@ acs_design <- data_chi %>%
 ```
 
 ```{r}
+
+# Multiple linear regression
+
+data_chi <- data %>%
+  dplyr::filter(age > 18, esr != "Not in Labor Force") %>%
+  mutate(
+    cit_simp = ifelse(cit != "Not a U.S. citizen", "Citizen", "Non-Citizen"),
+    cit_simp = factor(cit_simp, levels = c("Non-Citizen", "Citizen")),
+    income_brackets = case_when(
+      income_personal <= 15000 ~ "0-15k",
+      income_personal <= 30000 ~ "15k-30k",
+      income_personal <= 60000 ~ "30k-60k",
+      income_personal <= 90000 ~ "60k-90k",
+      income_personal <= 120000 ~ "90k-120k",
+      income_personal <= 150000 ~ "120k-150k",
+      income_personal > 150000 ~ "150k+"
+    ),
+    log_income = log(income_personal + 1)
+  ) %>%
+  dplyr::select(
+    age, income_personal, log_income,
+    income_brackets, race_simp, cit_simp, education,
+    pwgtp, pwgtp1:pwgtp80
+  )
+
+rep_weights <- paste0("pwgtp", 1:80)
+
+acs_design <- data_chi %>%
+  as_survey_rep(
+    weights = pwgtp,
+    repweights = all_of(rep_weights),
+    type = "successive-difference",
+    mse = TRUE
+  )
+
+log_income_model <- acs_design %>%
+  svyglm(
+    log_income ~ age + race_simp + education + cit_simp,
+    design = .,
+    family = gaussian()
+  )
+
+summary(log_income_model)
+
+#CHI SQUARED
+
+# Education x Income
+edu_inc <- acs_design %>% 
+  svychisq(formula = ~ education + income_brackets,
+           design = .,
+           statistic = "Chisq",
+           na.rm = TRUE)
+
+# Race x Citizenship
+race_cit <- acs_design %>% 
+  svychisq(formula = ~ race_simp + cit_simp,
+           design = .,
+           statistic = "Chisq",
+           na.rm = TRUE)
+
+# Race x Education
+race_edu <- acs_design %>% 
+  svychisq(formula = ~ race_simp + education,
+           design = .,
+           statistic = "Chisq",
+           nar.rm = TRUE)
+
+# Race x income
+race_inc <- acs_design %>% 
+  svychisq(formula = ~ race_simp + income_brackets,
+           design = .,
+           statistic = "Chisq",
+           nar.rm = TRUE)
+
+edu_inc
+race_cit
+race_edu
+race_inc
+
+
+
+```
+
+```{r}
 race_edu <- acs_design %>% 
   svychisq(formula = ~ race_simp + education,
            design = .,
