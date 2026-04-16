@@ -8,6 +8,8 @@ library(tidyverse)
 library(arrow)
 library(glmnet)
 library(gt)
+library(purrr)
+library(dplyr)
 
 data <- read_parquet("../data/clean_data.parquet")
 ```
@@ -111,3 +113,58 @@ Based on the selected coefficients,education is the strongest driver.
 Less than hs is about 51% lower in income than those with a post-bacc professional degree.
 ```
 
+```{r echo=FALSE}
+
+#Ridge vs Lasso Test
+
+w_rmse <- function(y, yhat, w) sqrt(weighted.mean((y - yhat)^2, w, na.rm = TRUE))
+
+fit_compare <- function(df, seed) {
+  set.seed(seed)
+  idx <- sample(seq_len(nrow(df)), size = 0.7*nrow(df))
+  train <- df[idx, ]
+  test  <- df[-idx, ]
+  
+  vars <- c("log_income","age","education","race_simp","cit_simp","pwgtp")
+  train <- train %>% filter(if_all(all_of(vars), ~ !is.na(.)))
+  test  <- test  %>% filter(if_all(all_of(vars), ~ !is.na(.)))
+  
+  x_train <- model.matrix(log_income ~ age + education + race_simp + cit_simp, train)[,-1]
+  x_test  <- model.matrix(log_income ~ age + education + race_simp + cit_simp, test)[,-1]
+  y_train <- train$log_income; y_test <- test$log_income
+  w_train <- train$pwgtp;      w_test <- test$pwgtp
+  
+  # LASSO
+  cv_l <- cv.glmnet(x_train, y_train, alpha=1, weights=w_train)
+  fit_l <- glmnet(x_train, y_train, alpha=1, lambda=cv_l$lambda.1se, weights=w_train)
+  pred_l <- as.numeric(predict(fit_l, newx=x_test))
+  rmse_l <- w_rmse(y_test, pred_l, w_test)
+  
+  # Ridge
+  cv_r <- cv.glmnet(x_train, y_train, alpha=0, weights=w_train)
+  fit_r <- glmnet(x_train, y_train, alpha=0, lambda=cv_r$lambda.1se, weights=w_train)
+  pred_r <- as.numeric(predict(fit_r, newx=x_test))
+  rmse_r <- w_rmse(y_test, pred_r, w_test)
+  
+  tibble(seed=seed, rmse_lasso=rmse_l, rmse_ridge=rmse_r)
+}
+
+
+results <- map_dfr(1:20, \(s) fit_compare(model_inputs, 100+s))
+
+results %>%
+  summarize(
+    mean_rmse_lasso = mean(rmse_lasso),
+    mean_rmse_ridge = mean(rmse_ridge),
+    ridge_wins = mean(rmse_ridge < rmse_lasso)
+  )
+
+results %>%
+  summarize(
+    mean_rmse_lasso = mean(rmse_lasso),
+    sd_rmse_lasso   = sd(rmse_lasso),
+    mean_rmse_ridge = mean(rmse_ridge),
+    sd_rmse_ridge   = sd(rmse_ridge),
+    ridge_wins      = mean(rmse_ridge < rmse_lasso)
+  )
+```
