@@ -1,0 +1,291 @@
+---
+title: "chi_square_ind_tests"
+format: pdf
+---
+
+```{r include=FALSE}
+library(tidyverse)
+library(arrow)
+library(purrr)
+library(survey)
+library(srvyr)
+library(broom)
+library(gt)
+
+data <- read_parquet("../../data/clean_data.parquet")
+```
+
+```{r echo=FALSE}
+data_chi <- data %>% 
+  dplyr::filter(age > 18,
+         esr != "Not in Labor Force"
+         ) %>% 
+  mutate(cit_simp = ifelse(cit != "Not a U.S. citizen",
+                                 "Citizen",
+                                 "Non-Citizen"),
+         cit_simp = factor(cit_simp,
+                           levels = c("Non-Citizen",
+                                            "Citizen")),
+         income_brackets = case_when(income_personal <= 15000 ~ "0-15k",
+                                     income_personal <= 30000 ~ "15k-30k",
+                                     income_personal <= 60000 ~ "30k-60k",
+                                     income_personal <= 90000 ~ "60k-90k",
+                                     income_personal <= 120000 ~ "90k-120k",
+                                     income_personal <= 150000 ~ "120k-150k",
+                                     income_personal > 150000 ~ "150k+")) %>% 
+  dplyr::select(income_brackets, race_simp, cit_simp, education,pwgtp, pwgtp1:pwgtp80)
+
+rep_weights <- paste0("pwgtp", 1:80)
+
+acs_design <- data_chi %>%
+  as_survey_rep(
+    weights    = pwgtp,
+    repweights = all_of(rep_weights),
+    type       = "successive-difference",
+    mse        = TRUE
+)
+```
+
+```{r}
+
+# Multiple linear regression
+
+data_chi <- data %>%
+  dplyr::filter(age > 18, esr != "Not in Labor Force") %>%
+  mutate(
+    cit_simp = ifelse(cit != "Not a U.S. citizen", "Citizen", "Non-Citizen"),
+    cit_simp = factor(cit_simp, levels = c("Non-Citizen", "Citizen")),
+    income_brackets = case_when(
+      income_personal <= 15000 ~ "0-15k",
+      income_personal <= 30000 ~ "15k-30k",
+      income_personal <= 60000 ~ "30k-60k",
+      income_personal <= 90000 ~ "60k-90k",
+      income_personal <= 120000 ~ "90k-120k",
+      income_personal <= 150000 ~ "120k-150k",
+      income_personal > 150000 ~ "150k+"
+    ),
+    log_income = log(income_personal + 1)
+  ) %>%
+  dplyr::select(
+    age, income_personal, log_income,
+    income_brackets, race_simp, cit_simp, education,
+    pwgtp, pwgtp1:pwgtp80
+  )
+
+rep_weights <- paste0("pwgtp", 1:80)
+
+acs_design <- data_chi %>%
+  as_survey_rep(
+    weights = pwgtp,
+    repweights = all_of(rep_weights),
+    type = "successive-difference",
+    mse = TRUE
+  )
+
+log_income_model <- acs_design %>%
+  svyglm(
+    log_income ~ age + race_simp + education + cit_simp,
+    design = .,
+    family = gaussian()
+  )
+
+summary(log_income_model)
+
+#CHI SQUARED
+
+# Education x Income
+edu_inc <- acs_design %>% 
+  svychisq(formula = ~ education + income_brackets,
+           design = .,
+           statistic = "Chisq",
+           na.rm = TRUE)
+
+# Race x Citizenship
+race_cit <- acs_design %>% 
+  svychisq(formula = ~ race_simp + cit_simp,
+           design = .,
+           statistic = "Chisq",
+           na.rm = TRUE)
+
+# Race x Education
+race_edu <- acs_design %>% 
+  svychisq(formula = ~ race_simp + education,
+           design = .,
+           statistic = "Chisq",
+           nar.rm = TRUE)
+
+# Race x income
+race_inc <- acs_design %>% 
+  svychisq(formula = ~ race_simp + income_brackets,
+           design = .,
+           statistic = "Chisq",
+           nar.rm = TRUE)
+
+edu_inc
+race_cit
+race_edu
+race_inc
+
+
+
+```
+
+```{r}
+race_edu <- acs_design %>% 
+  svychisq(formula = ~ race_simp + education,
+           design = .,
+           statistic = "Chisq",
+           nar.rm = TRUE)
+
+race_edu_table <- race_edu$observed %>% 
+  as_tibble() %>% 
+  group_by(education) %>% 
+  mutate(prop = round(n / sum (n), 2)) %>% 
+  dplyr::select(-n) %>% 
+  pivot_wider(names_from = race_simp, values_from = prop) %>% 
+  mutate(education = factor(education,
+                            levels = c("Post-bacc professional degree",
+                                       "Doctorate degree",
+                                       "Master's degree",
+                                       "Bachelor's degree",
+                                       "Associate's degree",
+                                       "Some college",
+                                       "Regular high school diploma",
+                                       "GED or alternative credential",
+                                       "Less than High School",
+                                       "No schooling completed"))) %>% 
+  arrange(education) %>% 
+  ungroup() %>% 
+  dplyr::select(education, Hispanic, White, Black, Asian, Other) %>% 
+  gt(rowname_col = "education") %>% 
+  tab_stubhead(label = "Education") %>% 
+  tab_spanner(label = "Race",
+              columns = everything()) %>% 
+  data_color(
+    columns = Hispanic,
+    method = "numeric",
+    palette = c("white", "#4daf4a")
+  ) %>%
+  data_color(
+    columns = White,
+    method = "numeric",
+    palette = c("white", "#377eb8")
+  ) %>%
+  data_color(
+    columns = Black,
+    method = "numeric",
+    palette = c("white", "#984ea3")
+  ) %>%
+  data_color(
+    columns = Asian,
+    method = "numeric",
+    palette = c("white", "#e41a1c")
+  ) %>%
+  data_color(
+    columns = Other,
+    method = "numeric",
+    palette = c("white", "#ff7f00")) %>% 
+  tab_source_note(
+    source_note = paste0(
+      "χ² = ", round(race_edu$statistic, 2),
+      ", p ", ifelse(race_edu$p.value < 0.001, "< .001", 
+                     paste0("= ", round(race_edu$p.value, 3)))
+    )
+  ) 
+
+gtsave(race_edu_table,
+       "../../../midterm_presentation/race_edu_table.png",
+       zoom = 3)
+```
+
+```{r}
+race_inc <- acs_design %>% 
+  svychisq(formula = ~ race_simp + income_brackets,
+           design = .,
+           statistic = "Chisq",
+           nar.rm = TRUE)
+
+race_inc_table <- race_inc$observed %>% 
+  as_tibble() %>% 
+  group_by(income_brackets) %>% 
+  mutate(prop = round(n / sum (n), 2)) %>% 
+  dplyr::select(-n) %>% 
+  pivot_wider(names_from = race_simp, values_from = prop) %>% 
+  mutate(income_brackets = factor(income_brackets,
+                                  levels = c("0-15k",
+                                             "15k-30k",
+                                             "30k-60k",
+                                             "60k-90k",
+                                             "90k-120k",
+                                             "120k-150k",
+                                             "150k+"))) %>% 
+  arrange(desc(income_brackets)) %>% 
+  ungroup() %>% 
+  dplyr::select(income_brackets, Hispanic, White, Black, Asian, Other) %>% 
+  gt(rowname_col = "income_brackets") %>% 
+  tab_stubhead(label = "Income") %>% 
+  tab_spanner(label = "Race",
+              columns = everything()) %>% 
+  data_color(
+    columns = Hispanic,
+    method = "numeric",
+    palette = c("white", "#4daf4a")
+  ) %>%
+  data_color(
+    columns = White,
+    method = "numeric",
+    palette = c("white", "#377eb8")
+  ) %>%
+  data_color(
+    columns = Black,
+    method = "numeric",
+    palette = c("white", "#984ea3")
+  ) %>%
+  data_color(
+    columns = Asian,
+    method = "numeric",
+    palette = c("white", "#e41a1c")
+  ) %>%
+  data_color(
+    columns = Other,
+    method = "numeric",
+    palette = c("white", "#ff7f00")) %>% 
+  tab_source_note(
+    source_note = paste0(
+      "χ² = ", round(race_inc$statistic, 2),
+      ", p ", ifelse(race_inc$p.value < 0.001, "< .001", 
+                     paste0("= ", round(race_inc$p.value, 3)))
+    )
+  ) 
+
+gtsave(race_inc_table,
+       "../../../midterm_presentation/race_inc_table.png",
+       zoom = 3)
+```
+
+```{r}
+cit_inc <- acs_design %>% 
+  filter(race_simp == "Hispanic") %>% 
+  svychisq(formula = ~ education + income_brackets,
+           design = .,
+           statistic = "Chisq",
+           nar.rm = TRUE)
+
+cit_inc$observed %>% 
+  as.tibble() %>% 
+  group_by(education) %>%
+  mutate(prop = round(n / sum (n), 2)) %>% 
+  dplyr::select(-n) %>% 
+  pivot_wider(names_from = education, values_from = prop) %>% 
+  mutate(income_brackets = factor(income_brackets,
+                                  levels = c("0-15k",
+                                             "15k-30k",
+                                             "30k-60k",
+                                             "60k-90k",
+                                             "90k-120k",
+                                             "120k-150k",
+                                             "150k+"))) %>% 
+  arrange(desc(income_brackets)) %>% 
+  ungroup()
+```
+

@@ -1,0 +1,118 @@
+---
+title: "t_tests"
+format: pdf
+---
+
+```{r include=FALSE}
+library(tidyverse)
+library(arrow)
+library(purrr)
+library(survey)
+library(srvyr)
+library(broom)
+library(webshot2)
+library(gt)
+
+data <- read_parquet("../../data/clean_data.parquet")
+```
+
+```{r echo=FALSE}
+data_selected <- data %>% 
+  dplyr::filter(age > 18,
+         esr != "Not in Labor Force"
+         ) %>% 
+  mutate(cit_simp = ifelse(cit != "Not a U.S. citizen",
+                                 "Citizen",
+                                 "Non-Citizen"),
+         cit_simp = factor(cit_simp,
+                           levels = c("Non-Citizen",
+                                            "Citizen"))) %>% 
+  dplyr::select(income_personal, age, race_simp, cit_simp, gross_rent, education, health_insurance,
+          snap_benefits, jwtrns, puma, pwgtp, pwgtp1:pwgtp80)
+
+rep_weights <- paste0("pwgtp", 1:80)
+
+acs_design <- data_selected %>%
+  as_survey_rep(
+    weights    = pwgtp,
+    repweights = all_of(rep_weights),
+    type       = "successive-difference",
+    mse        = TRUE
+)
+```
+
+```{r}
+sample_size_table <- acs_design %>%
+  filter(education %in% c("Regular high school diploma", "Bachelor's degree")) %>%
+  group_by(race_simp, education) %>%
+  summarise(
+    sample_size = n()
+  ) %>%
+  arrange(education, race_simp) %>% 
+  dplyr::select(education, race_simp,sample_size) %>% 
+  pivot_wider(names_from = "race_simp",
+              values_from = "sample_size") %>% 
+  dplyr::select(education, Hispanic, White, Black, Asian, Other) %>% 
+  gt(rowname_col = "education") %>% 
+  tab_stubhead(label = "Education") %>% 
+  tab_spanner(label = "Race",
+              columns = everything())
+
+sample_size_table
+
+gtsave(sample_size_table,
+       "../../../midterm_presentation/sample_size_table.png",
+       zoom = 3)
+```
+
+
+```{r}
+races <- acs_design %>% 
+  pull(race_simp) %>% 
+  unique() %>% 
+  na.omit()
+
+results <- map(races, ~ {
+  acs_design %>%
+    filter(
+      race_simp == .x,
+      education %in% c("Regular high school diploma", "Bachelor's degree")
+    ) %>%
+    mutate(education = droplevels(as.factor(education)),
+           education = relevel(education, ref = "Regular high school diploma")) %>%
+    svyttest(income_personal ~ education, design = ., na.rm = TRUE)
+}) %>%
+  set_names(races)
+```
+
+```{r}
+t_tests_table <- map_dfr(results, tidy, .id = "race") %>%
+    arrange(desc(estimate)) %>% 
+    mutate(comparison = paste0(race, ": bach - hs")) %>%
+  dplyr::select(comparison, estimate, p.value) %>%
+  gt() %>%
+  cols_label(
+    comparison = "Comparison",
+    estimate   = "Estimate ($)",
+    p.value    = "P-Value"
+  ) %>%
+  fmt_number(columns = estimate, decimals = 0) %>%
+  fmt(columns = p.value,
+      fns = ~ ifelse(. < 0.001, "< .001", round(., 3)))
+
+gtsave(t_tests_table,
+       "../../../midterm_presentation/t_tests_table.png",
+       zoom = 3)
+```
+
+```{r}
+acs_design %>%
+  filter(education %in% c("Regular high school diploma", "Bachelor's degree")) %>%
+  group_by(race_simp, education) %>%
+  summarise(
+    sd_income = survey_sd(income_personal, na.rm = TRUE)
+  ) %>%
+  arrange(education, race_simp) %>% 
+  pivo
+```
+

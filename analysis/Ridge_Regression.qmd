@@ -1,0 +1,116 @@
+---
+title: "ridge_income"
+format: pdf
+---
+
+```{r include=FALSE}
+library(tidyverse)
+library(arrow)
+library(glmnet)
+library(gt)
+
+data <- read_parquet("../data/clean_data.parquet")
+```
+
+```{r echo=FALSE}
+
+# Data 
+
+model_inputs <- data %>% 
+  dplyr::filter(age > 18,
+                esr != "Not in Labor Force") %>% 
+  dplyr::mutate(
+    education = case_when(
+      education == "No schooling completed" ~ "Less than High School",
+      TRUE ~ education
+    ),
+    cit_simp = ifelse(cit != "Not a U.S. citizen", "Citizen", "Non-Citizen"),
+    cit_simp = factor(cit_simp, levels = c("Citizen","Non-Citizen")),
+    education = factor(education,
+      levels = c("Post-bacc professional degree",
+                 "Doctorate degree",
+                 "Master's degree",
+                 "Bachelor's degree",
+                 "Associate's degree",
+                 "Some college",
+                 "Regular high school diploma",
+                 "GED or alternative credential",
+                 "Less than High School"))
+  ) %>% 
+  select(income_personal, race_simp, cit_simp, education, pwgtp, pwgtp1:pwgtp80, age)
+
+rep_weights <- paste0("pwgtp", 1:80)
+
+ridge_design <- model_inputs %>% 
+  mutate(
+    log_income = log(income_personal),
+    education  = relevel(factor(education), ref = "Bachelor's degree"),
+    race_simp  = relevel(factor(race_simp), ref = "Hispanic"),
+    cit_simp   = relevel(factor(cit_simp),  ref = "Citizen")
+  ) %>% 
+  filter(is.finite(log_income), !is.na(pwgtp)) %>%
+  mutate(
+    race_simp  = droplevels(factor(race_simp)),
+    education  = droplevels(factor(education)),
+    cit_simp   = droplevels(factor(cit_simp))
+  )
+
+
+# Train/test split 
+
+set.seed(123)
+idx <- sample(seq_len(nrow(ridge_design)), size = 0.7 * nrow(ridge_design))
+train <- ridge_design[idx, ]
+test  <- ridge_design[-idx, ]
+
+w_train <- train$pwgtp
+w_test  <- test$pwgtp
+
+w_rmse <- function(y, yhat, w) sqrt(weighted.mean((y - yhat)^2, w, na.rm = TRUE))
+w_mae  <- function(y, yhat, w) weighted.mean(abs(y - yhat), w, na.rm = TRUE)
+
+
+vars_needed <- c("log_income","age","education","race_simp","cit_simp","pwgtp")
+
+train_cc <- train %>% filter(if_all(all_of(vars_needed), ~ !is.na(.)))
+test_cc  <- test  %>% filter(if_all(all_of(vars_needed), ~ !is.na(.)))
+
+w_train_cc <- train_cc$pwgtp
+w_test_cc  <- test_cc$pwgtp
+
+x_train <- model.matrix(log_income ~ age + education + race_simp + cit_simp, data = train_cc)[, -1]
+x_test  <- model.matrix(log_income ~ age + education + race_simp + cit_simp, data = test_cc)[, -1]
+y_train <- train_cc$log_income
+y_test  <- test_cc$log_income
+
+# Ridge fit + weighted evaluation
+
+set.seed(123)
+cv_ridge <- cv.glmnet(x_train, y_train, alpha = 0, weights = w_train_cc)
+ridge_fit <- glmnet(x_train, y_train, alpha = 0, lambda = cv_ridge$lambda.1se, weights = w_train_cc)
+
+pred <- as.numeric(predict(ridge_fit, newx = x_test))
+
+rmse_ridge <- w_rmse(y_test, pred, w_test_cc)
+mae_ridge  <- w_mae(y_test, pred, w_test_cc)
+
+rmse_ridge
+mae_ridge
+```
+
+```{r echo=FALSE}
+
+coef_mat <- as.matrix(coef(ridge_fit))
+coef_tbl <- tibble(
+  term = rownames(coef_mat),
+  coef = as.numeric(coef_mat[, 1])
+) %>%
+  filter(term != "(Intercept)") %>%
+  arrange(desc(abs(coef))) %>%
+  slice_head(n = 15)
+
+coef_tbl %>%
+  gt() %>%
+  tab_header(title = "Ridge Coefficients") %>%
+  fmt_number(columns = coef, decimals = 3)
+```

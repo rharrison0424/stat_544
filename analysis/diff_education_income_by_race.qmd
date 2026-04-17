@@ -191,10 +191,14 @@ income_education <- acs_design %>%
 ```
 
 ```{r}
+<<<<<<< HEAD
 totals <- income_education %>%
   group_by(race_simp) %>%
   summarise(total = n())
 print(totals)
+=======
+glimpse(income_education)
+>>>>>>> 089ed641778af6636414fd365118f5d7cb3cd1be
 ```
 
 
